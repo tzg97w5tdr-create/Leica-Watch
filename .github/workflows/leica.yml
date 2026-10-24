@@ -1,18 +1,21 @@
 name: Leica Classic watch
 
 on:
-  schedule:
-    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: leica-watch
+  cancel-in-progress: false
+
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 2
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Check new arrivals
         env:
@@ -42,7 +45,7 @@ jobs:
               grep -qxF "$id" seen.txt || printf '%s\n' "$name"
             done)
             [ -z "$NEW" ] && exit 0
-            curl -s -H "Title: Leica Classic - new" -d "$NEW" "https://ntfy.sh/$TOPIC" >/dev/null
+            curl -s --max-time 20 -H "Title: Leica Classic - new" -d "$NEW" "https://ntfy.sh/$TOPIC" >/dev/null
             { printf '%s\n' "$ITEMS" | cut -d'|' -f1; cat seen.txt; } | awk '!x[$0]++' | head -500 > seen.tmp
             mv seen.tmp seen.txt
           fi
