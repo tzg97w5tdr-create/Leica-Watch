@@ -18,7 +18,7 @@ jobs:
         env:
           TOPIC: leica-classic-7f3k9q2m4x
         run: |
-          URL="https://classic.leica-camera.com/en/Leica-New-Arrivals/"
+          URL="https://classic.leica-camera.com/en/Leica-New-Arrivals/?order=release-date&p=1"
           HTML=$(curl -sL --max-time 30 -A "Mozilla/5.0" "$URL") || exit 0
 
           ITEMS=$(printf '%s' "$HTML" | perl -0ne '
