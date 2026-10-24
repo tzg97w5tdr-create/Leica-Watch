@@ -1,0 +1,53 @@
+name: Leica Classic watch
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check new arrivals
+        env:
+          TOPIC: leica-classic-7f3k9q2m4x
+        run: |
+          URL="https://classic.leica-camera.com/en/Leica-New-Arrivals/"
+          HTML=$(curl -sL --max-time 30 -A "Mozilla/5.0" "$URL") || exit 0
+
+          ITEMS=$(printf '%s' "$HTML" | perl -0ne '
+            while (/<a\b[^>]*class="[^"]*product-name[^"]*"[^>]*>/g) {
+              my $t = $&;
+              my ($h) = $t =~ /href="([^"]+)"/;
+              my ($n) = $t =~ /title="([^"]+)"/;
+              next unless $h && $n;
+              $h =~ s{[?#].*}{}; $h =~ s{/$}{}; (my $id = $h) =~ s{.*/}{};
+              $n =~ s/&amp;/&/g; $n =~ s/&quot;/"/g; $n =~ s/&#0?39;/\x27/g;
+              print "$id|$n\n" unless $s{$id}++;
+            }')
+
+          if [ -z "$ITEMS" ]; then echo "No items found (page blocked or changed)"; exit 0; fi
+          echo "$ITEMS"
+
+          if [ ! -f seen.txt ]; then
+            printf '%s\n' "$ITEMS" | cut -d'|' -f1 > seen.txt
+          else
+            NEW=$(printf '%s\n' "$ITEMS" | while IFS='|' read -r id name; do
+              grep -qxF "$id" seen.txt || printf '%s\n' "$name"
+            done)
+            [ -z "$NEW" ] && exit 0
+            curl -s -H "Title: Leica Classic - new" -d "$NEW" "https://ntfy.sh/$TOPIC" >/dev/null
+            { printf '%s\n' "$ITEMS" | cut -d'|' -f1; cat seen.txt; } | awk '!x[$0]++' | head -500 > seen.tmp
+            mv seen.tmp seen.txt
+          fi
+
+          git config user.name "leica-bot"
+          git config user.email "leica-bot@users.noreply.github.com"
+          git add seen.txt
+          git commit -m "update seen" && git push || true
