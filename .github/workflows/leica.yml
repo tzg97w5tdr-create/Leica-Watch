@@ -19,7 +19,8 @@ jobs:
 
       - name: Check new arrivals
         env:
-          TOPIC: leica-classic-7f3k9q2m4x
+          TG_TOKEN: ${{ secrets.TG_TOKEN }}
+          TG_CHAT: ${{ secrets.TG_CHAT }}
         run: |
           URL="https://classic.leica-camera.com/en/Leica-New-Arrivals/?order=release-date&p=1"
           HTML=$(curl -sL --max-time 30 -A "Mozilla/5.0" "$URL") || exit 0
@@ -45,7 +46,10 @@ jobs:
               grep -qxF "$id" seen.txt || printf '%s\n' "$name"
             done)
             [ -z "$NEW" ] && exit 0
-            curl -s --max-time 20 -H "Title: Leica Classic - new" -d "$NEW" "https://ntfy.sh/$TOPIC" >/dev/null
+            RESP=$(curl -s --max-time 20 "https://api.telegram.org/bot$TG_TOKEN/sendMessage" \
+              --data-urlencode "chat_id=$TG_CHAT" \
+              --data-urlencode "text=$NEW")
+            echo "Telegram: $RESP"
             { printf '%s\n' "$ITEMS" | cut -d'|' -f1; cat seen.txt; } | awk '!x[$0]++' | head -500 > seen.tmp
             mv seen.tmp seen.txt
           fi
